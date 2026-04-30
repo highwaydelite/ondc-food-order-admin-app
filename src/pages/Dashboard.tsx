@@ -84,6 +84,9 @@ const Dashboard: React.FC = () => {
     issueStatusAt: order.issueStatusAt,
     settleStatus: order.payment.settleStatus,
     settleStatusAt: order.payment.settleUpdatedAt,
+    transferStatus: order.rpRouteTransfer?.status || "NA",
+    transferStatusAt: order?.rpRouteTransfer?.statusUpdatedAt,
+    transferSettleStatus: order.rpRouteTransfer?.settlementStatus || "NA",
   }));
 
   const handleApplyFilters = (newFilters: Partial<Filters>) => {

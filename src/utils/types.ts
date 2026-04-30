@@ -65,6 +65,18 @@ export type OrderResponse = {
   issueStatus: "NONE" | "OPEN" | "ESCALATED_TO_SELLER" | "CLOSED";
   issueStatusUpdatedAt: string;
   issues: Issue[];
+  rpRouteTransfer: {
+    amount: number;
+    createdAt: string;
+    currency: string;
+    rpAccountId: string;
+    rpPaymentId: string;
+    rpTransferId: string;
+    settlementStatus: string;
+    settlementUpdatedAt: string;
+    status: string;
+    statusUpdatedAt: string;
+  };
 };
 
 /* -------------------- Items -------------------- */
