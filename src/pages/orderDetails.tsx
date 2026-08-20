@@ -646,6 +646,37 @@ const OrderDetails: React.FC = () => {
         </CardContent>
       </div>
 
+      {/* ROUTE TRANSFER DETAILS */}
+      {order.rpRouteTransfer && (
+        <div className="w-full border bg-white rounded-lg pb-2">
+          <div className="px-6 py-auto border-b flex align-center bg-gray-50 rounded-t-lg">
+            <h1 className="py-3 font-bold ">Route Transfer Details</h1>
+          </div>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <DataCard>
+                <DataRow label="Amount" value={order.rpRouteTransfer.amount / 100} />
+                  <DataRow label="Status" value={order.rpRouteTransfer.status} />
+                  <DataRow label="Settlement Status" value={order.rpRouteTransfer.settlementStatus} />
+                  <DataRow label="RP Transfer ID" value={order.rpRouteTransfer.rpTransferId} />
+                  <DataRow label="RP Payment ID" value={order.rpRouteTransfer.rpPaymentId} />
+                </DataCard>
+                <DataCard>
+                <DataRow label="Created At" value={convertToIST(order.rpRouteTransfer.createdAt)} />
+                  <DataRow label="Status Updated At" value={convertToIST(order.rpRouteTransfer.statusUpdatedAt)} />
+                  <DataRow label="Settlement Updated At" value={convertToIST(order.rpRouteTransfer.settlementUpdatedAt)} />
+                  <DataRow label="RP Aczcount ID" value={order.rpRouteTransfer.rpAccountId} />
+                  <DataRow label="Updated At" value={convertToIST(order.rpRouteTransfer.statusUpdatedAt)} />
+                </DataCard>
+              </div>
+             
+           
+            </div>
+          </CardContent>
+        </div>
+      )}
+
       {/* SETTLEMENT DETAILS */}
       {order.settlementOrders.length > 0 && (
         <div className="w-full border bg-white rounded-lg pb-2">

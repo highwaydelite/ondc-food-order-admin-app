@@ -121,25 +121,35 @@ export const columns: ColumnDef<Order>[] = [
     },
   },
   {
-    accessorKey: "settleStatus",
-    header: "Settlement Status",
+    accessorKey: "transferStatus",
+    header: "Transfer Status",
     cell: ({ row }) => (
-      <span className={`${getStatusColor(row.getValue("settleStatus"))}`}>
-        {row.getValue("settleStatus")}
+      <span className={`${getStatusColor(row.getValue("transferStatus"))}`}>
+        {row.getValue("transferStatus")}
       </span>
     ),
   },
   {
-    accessorKey: "settleStatusAt",
-    header: "Settlement Status Updated At",
+    accessorKey: "transferStatusAt",
+    header: "Transfer Status Updated At",
     cell: ({ row }) => {
-      const date = row.getValue("settleStatusAt");
+      const date = row.getValue("transferStatusAt");
+      console.log(date);
       return (
-        <div className="whitespace-nowrap w-40 text-center">
-          {date ? convertToIST(row.getValue("settleStatusAt")) : "-"}
+        <div className="whitespace-nowrap w-32 text-center">
+          {date ? convertToIST(row.getValue("transferStatusAt")) : "-"}
         </div>
       );
     },
+  },
+  {
+    accessorKey: "transferSettleStatus",
+    header: "Transfer Settlement Status",
+    cell: ({ row }) => (
+      <span className={`${getStatusColor(row.getValue("transferSettleStatus"))}`}>
+        {row.getValue("transferSettleStatus")}
+      </span>
+    ),
   },
 ];
 
