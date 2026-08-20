@@ -1,6 +1,6 @@
 export function getStatusColor(status: string) {
   switch (status) {
-    // Common Statuses
+    // Common Status
     case "INITIATED":
     case "NONE":
     case "Created":
