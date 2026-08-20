@@ -36,7 +36,6 @@ export function getStatusColor(status: string) {
     case "DONE":
     case "CORRECTION_APPROVED":
     case "Accepted":
-    case "SUCCESS":
       return "border border-[#4F46E5] bg-[#E0E7FF] text-black text-[11px] font-light px-3 py-1 rounded w-fit"; // Blue
     case "CLOSED":
       return "border border-[#4B5563] bg-[#D1D5DB] text-black text-[11px] font-light px-3 py-1 rounded w-fit"; // Dark Gray
