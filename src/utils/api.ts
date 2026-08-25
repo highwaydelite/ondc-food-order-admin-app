@@ -1,23 +1,32 @@
 import axios from "axios";
-import { userManager } from "../config";
+import type { AxiosRequestConfig } from "axios";
+import { getKeyCloakToken, redirectToLogin, refreshToken } from "../config";
+import {
+  ApiError,
+  AuthConfigurationError,
+  apiErrorFromAxios,
+  apiErrorFromResponse,
+} from "./apiError";
+import type { OrderFilterState } from "./adminEnums";
+import {
+  buildOrderFilterParams,
+  normalizePagination,
+  toSearchParams,
+} from "./orderQueryParams";
+import { istEndOfDayISO, istStartOfDayISO } from "./dateRange";
 
-const getToken = async () => {
-  try {
-    const user = await userManager.getUser();
-    if (user && !user.expired) {
-      return user.access_token;
-    } else {
-      console.log("User is not logged in or token has expired.");
-      return null;
-    }
-  } catch (error) {
-    console.error("Error retrieving token:", error);
-    return null;
-  }
-};
+export const API_BASE_URL = import.meta.env.VITE_SERVER_BASE_URL;
+
+/**
+ * Every `/orders/admin/*` endpoint now requires a Keycloak bearer token carrying the
+ * ADMIN client role, so the token has to be fresh on every call — including the CSV
+ * export, which is fetched rather than opened in a new tab.
+ */
+export const getAccessToken = async (): Promise<string | null> =>
+  getKeyCloakToken();
 
 export const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_SERVER_BASE_URL,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -25,77 +34,177 @@ export const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   async (config) => {
-    const token = await getToken();
+    const token = await getAccessToken();
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
+  (error) => Promise.reject(apiErrorFromAxios(error))
+);
+
+type RetriableConfig = AxiosRequestConfig & { _retriedAfterRefresh?: boolean };
+
+/**
+ * Authorization is enforced entirely by the backend; the frontend only reacts to it.
+ *
+ * 401 -> run the refresh flow and replay the request once. If a freshly refreshed
+ *        token is rejected too, stop: refreshing again would loop, so surface a
+ *        configuration error instead.
+ * 403 -> surfaced as an error state and never retried. Not expected for admin users.
+ */
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = error?.response?.status;
+    const config = error?.config as RetriableConfig | undefined;
+
+    if (status === 401 && config) {
+      if (config._retriedAfterRefresh) {
+        return Promise.reject(new AuthConfigurationError());
+      }
+
+      config._retriedAfterRefresh = true;
+      const user = await refreshToken();
+
+      if (user?.access_token && !user.expired) {
+        config.headers = {
+          ...(config.headers ?? {}),
+          Authorization: `Bearer ${user.access_token}`,
+        };
+        return axiosInstance.request(config);
+      }
+
+      // The refresh flow itself failed — the session really is gone.
+      await redirectToLogin();
+    }
+
+    if (status === 403) {
+      console.error(
+        `[api] 403 Forbidden on ${config?.method?.toUpperCase() ?? "GET"} ${
+          config?.url ?? ""
+        } — the backend rejected this token's permissions.`
+      );
+    }
+
+    return Promise.reject(apiErrorFromAxios(error));
   }
 );
 
-export async function getOrders(params: {
+export type OrdersListParams = {
   page: number;
   limit: number;
-  paymentStatus?: string;
-  orderStatus?: string;
-  issueStatus?: string;
-  settleStatus?: string;
-  startDate?: string;
-  endDate?: string;
-  userMobile?: string;
-  paymentOrderId?: string;
-}) {
+} & Partial<OrderFilterState>;
+
+/**
+ * `page` and `limit` are mandatory now (integers >= 1) — omitting them, or sending 0
+ * or an empty string, is a 400. There is no "fetch everything" mode any more; use
+ * the CSV export for bulk data.
+ */
+export async function getOrders(params: OrdersListParams) {
+  const { page, limit } = normalizePagination(params.page, params.limit);
+  const query = {
+    page,
+    limit,
+    ...buildOrderFilterParams(params),
+  };
+
   try {
     const response = await axiosInstance.get(`/orders/admin/orders/`, {
-      params: {
-        page: params.page,
-        limit: params.limit,
-        paymentStatus: params.paymentStatus || undefined,
-        orderStatus: params.orderStatus || undefined,
-        issueStatus: params.issueStatus || undefined,
-        settleStatus: params.settleStatus || undefined,
-        startDate: params.startDate || undefined,
-        endDate: params.endDate || undefined,
-        userMobile: params.userMobile || undefined,
-        paymentOrderId: params.paymentOrderId || undefined,
-      },
+      params: query,
     });
     return response.data;
-  } catch (error: any) {
-    throw { error: error?.response?.data || error.message };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
+/** An unknown orderId comes back as 400 "Order not found" here, not 404. */
 export async function getOrderById(orderId: string) {
   try {
     const response = await axiosInstance.get(
       `/orders/admin/order-details/${orderId}`
     );
     return response.data;
-  } catch (error: any) {
-    throw { error: error?.response?.data || error.message };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
-export async function exportOrders(params: {
-  paymentStatus?: string;
-  orderStatus?: string;
-  issueStatus?: string;
-  settleStatus?: string;
-  startDate?: string;
-  endDate?: string;
-  userMobile?: string;
-  paymentOrderId?: string;
-}) {
-  const response = await axiosInstance.get("/orders/admin/export", {
-    params,
-    responseType: "blob",
-  });
+/**
+ * 18 columns. `Transfer Status` / `Transfer Status Updated At` /
+ * `Transfer Settlement Status` were inserted at 15-17, pushing `Created At` to 18.
+ * Only used as an integrity check on the streamed response — nothing here parses the
+ * CSV positionally.
+ */
+export const CSV_EXPORT_HEADER =
+  "Order ID,Payment Order ID,Restaurant Name,User Name,User Phone,Amount,Order Status,Order Status Updated At,Payment Status,Payment Status Updated At,Issue Status,Issue Status Updated At,Settlement Status,Settlement Status Updated At,Transfer Status,Transfer Status Updated At,Transfer Settlement Status,Created At";
 
-  return response.data;
+/**
+ * Streamed CSV (not XLSX any more). It needs the Authorization header, so it cannot be
+ * a `window.open` / `<a href>` download — the header would not be sent and the browser
+ * would save the 401 JSON body as a file.
+ *
+ * There is no Content-Length on the response, so progress cannot be reported; callers
+ * should show an indeterminate spinner.
+ */
+export async function exportOrdersCsv(
+  filters: Partial<OrderFilterState> | null | undefined,
+  { retriedAfterRefresh = false }: { retriedAfterRefresh?: boolean } = {}
+): Promise<Blob> {
+  const token = await getAccessToken();
+  if (!token) {
+    await redirectToLogin();
+    throw new ApiError("Unauthorized", 401);
+  }
+
+  const search = toSearchParams({ ...buildOrderFilterParams(filters) });
+  const query = search.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/orders/admin/export${query ? `?${query}` : ""}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  // Must run before the body is treated as a file, or a 401 gets saved as orders.csv.
+  if (!response.ok) {
+    const apiError = await apiErrorFromResponse(response);
+
+    if (apiError.isUnauthorized) {
+      // A freshly refreshed token was rejected too — refreshing again would loop.
+      if (retriedAfterRefresh) throw new AuthConfigurationError();
+
+      const user = await refreshToken();
+      if (user?.access_token && !user.expired) {
+        return exportOrdersCsv(filters, { retriedAfterRefresh: true });
+      }
+      await redirectToLogin();
+    }
+    throw apiError;
+  }
+
+  const blob = await response.blob();
+
+  // The stream can die mid-flight after the 200 headers are already sent, which
+  // yields a silently truncated file. A missing/mangled header row catches the worst case.
+  if (blob.size === 0) {
+    throw new ApiError(
+      "The export came back empty. Please try again.",
+      response.status
+    );
+  }
+
+  const firstLine = (await blob.slice(0, CSV_EXPORT_HEADER.length + 4).text())
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)[0]
+    .trim();
+  if (firstLine !== CSV_EXPORT_HEADER) {
+    throw new ApiError(
+      "The export file looks incomplete. Please try again.",
+      response.status
+    );
+  }
+
+  return blob;
 }
 
 export async function getSettlements(params: {
@@ -116,11 +225,10 @@ export async function getSettlements(params: {
   reconAccord?: string;
 }) {
   try {
+    const { page, limit } = normalizePagination(params.page, params.limit);
+
     // Build query parameters object
-    const queryParams: any = {
-      page: params.page,
-      limit: params.limit,
-    };
+    const queryParams: any = { page, limit };
 
     // Add status filters if they exist
     if (params.settleStatus) queryParams.settleStatus = params.settleStatus;
@@ -128,19 +236,17 @@ export async function getSettlements(params: {
     if (params.selfStatus) queryParams.selfStatus = params.selfStatus;
     if (params.type) queryParams.type = params.type;
 
-    // Add date filters if they exist
-    if (params.createdAt?.startDate) {
-      queryParams.createdStartDate = params.createdAt.startDate;
-    }
-    if (params.createdAt?.endDate) {
-      queryParams.createdEndDate = params.createdAt.endDate;
-    }
-    if (params.updatedAt?.startDate) {
-      queryParams.updatedStartDate = params.updatedAt.startDate;
-    }
-    if (params.updatedAt?.endDate) {
-      queryParams.updatedEndDate = params.updatedAt.endDate;
-    }
+    // Date filters are stored as IST business days and widened to the exact
+    // instants that bound that day, using the same helpers as the orders list.
+    const createdStart = istStartOfDayISO(params.createdAt?.startDate);
+    const createdEnd = istEndOfDayISO(params.createdAt?.endDate);
+    const updatedStart = istStartOfDayISO(params.updatedAt?.startDate);
+    const updatedEnd = istEndOfDayISO(params.updatedAt?.endDate);
+
+    if (createdStart) queryParams.createdStartDate = createdStart;
+    if (createdEnd) queryParams.createdEndDate = createdEnd;
+    if (updatedStart) queryParams.updatedStartDate = updatedStart;
+    if (updatedEnd) queryParams.updatedEndDate = updatedEnd;
 
     // Add amount filters if they exist
     if (params.amount?.min)
@@ -164,8 +270,8 @@ export async function getSettlements(params: {
     });
 
     return response.data;
-  } catch (error: any) {
-    throw { error: error?.response?.data || error.message };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
@@ -189,8 +295,8 @@ export async function selfSettle(data: { amount: number }) {
     };
     const response = await axiosInstance.post("/settle", requestData);
     return response.data;
-  } catch (error: any) {
-    throw { error: error };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
@@ -201,8 +307,8 @@ export async function sendRecon(data: {
   try {
     const response = await axiosInstance.post("/send_recon", data);
     return response.data;
-  } catch (error: any) {
-    throw { error: error };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
@@ -210,8 +316,8 @@ export async function getSettlementById(settlementId: string) {
   try {
     const response = await axiosInstance.get(`/settlement/${settlementId}`);
     return response.data;
-  } catch (error: any) {
-    throw { error: error?.response?.data || error.message };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
@@ -226,8 +332,8 @@ export async function updateAmount(data: {
   try {
     const response = await axiosInstance.patch("/update_amount", data);
     return response.data;
-  } catch (error: any) {
-    throw { error: error };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
@@ -237,8 +343,8 @@ export async function approveCorrection(orderId: string) {
       orderId,
     });
     return response.data;
-  } catch (error: any) {
-    throw { error: error?.response?.data || error.message };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
@@ -254,8 +360,8 @@ export async function report(data: {
       message_id: data.message_id,
     });
     return response.data;
-  } catch (error: any) {
-    throw { error: error };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }
 
@@ -271,7 +377,7 @@ export async function registerIssue(data: {
       message_id: data.message_id,
     });
     return response.data;
-  } catch (error: any) {
-    throw { error: error };
+  } catch (error) {
+    throw apiErrorFromAxios(error);
   }
 }

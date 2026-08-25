@@ -1,3 +1,8 @@
+import type {
+  TransferSettlementStatus,
+  TransferStatus,
+} from "./adminEnums";
+
 export type CategoryType =
   | "CULTURE_HERITAGE"
   | "LEISURE"
@@ -65,18 +70,31 @@ export type OrderResponse = {
   issueStatus: "NONE" | "OPEN" | "ESCALATED_TO_SELLER" | "CLOSED";
   issueStatusUpdatedAt: string;
   issues: Issue[];
-  rpRouteTransfer: {
-    amount: number;
-    createdAt: string;
-    currency: string;
-    rpAccountId: string;
-    rpPaymentId: string;
-    rpTransferId: string;
-    settlementStatus: string;
-    settlementUpdatedAt: string;
-    status: string;
-    statusUpdatedAt: string;
-  };
+  /** Null when no Razorpay Route transfer has been attempted for the order. */
+  rpRouteTransfer: RpRouteTransfer | null;
+};
+
+/**
+ * Razorpay Route transfer. `amount` is in paise. Every field except `amount`,
+ * `status` and `createdAt` can come back null — a failed transfer has no
+ * transfer/settlement data but does carry `errorCode`/`errorDescription`.
+ */
+export type RpRouteTransfer = {
+  amount: number;
+  createdAt: string;
+  currency: string;
+  errorCode: string | null;
+  errorDescription: string | null;
+  notes: Record<string, string> | null;
+  rpAccountId: string | null;
+  rpPaymentId: string | null;
+  rpTransferId: string | null;
+  /** Returned but NOT filterable — there is no `transferSettlementStatus` query param. */
+  settlementStatus: TransferSettlementStatus | null;
+  settlementUpdatedAt: string | null;
+  /** Filterable via the `transferStatus` query param. */
+  status: TransferStatus;
+  statusUpdatedAt: string | null;
 };
 
 /* -------------------- Items -------------------- */

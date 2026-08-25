@@ -22,7 +22,8 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  pageCount: number;
+  /** Total number of matching rows (`data.total` from the API), not the page size. */
+  total: number;
   pagination: PaginationState;
   setPagination: (updater: Updater<PaginationState>) => void;
 }
@@ -30,10 +31,13 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
-  pageCount,
+  total,
   pagination,
   setPagination,
 }: DataTableProps<TData, TValue>) {
+  // The table wants a page count; the API gives a row count.
+  const pageCount = Math.max(1, Math.ceil(total / Math.max(pagination.pageSize, 1)));
+
   const table = useReactTable({
     data,
     columns,
@@ -119,13 +123,9 @@ export function DataTable<TData, TValue>({
       <div className="flex items-center justify-between mt-4 flex-wrap">
         <span className="text-sm text-gray-400">
           Showing data{" "}
-          {Math.min(pagination.pageIndex * pagination.pageSize + 1, pageCount)}{" "}
-          to{" "}
-          {Math.min(
-            (pagination.pageIndex + 1) * pagination.pageSize,
-            pageCount
-          )}{" "}
-          of {pageCount} {""}
+          {Math.min(pagination.pageIndex * pagination.pageSize + 1, total)} to{" "}
+          {Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)} of{" "}
+          {total} {""}
         </span>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -151,9 +151,7 @@ export function DataTable<TData, TValue>({
             {"<"}
           </button>
 
-          {Array.from({
-            length: Math.ceil(pageCount / pagination.pageSize),
-          }).map((_, index) => {
+          {Array.from({ length: pageCount }).map((_, index) => {
             const isCurrent = index === pagination.pageIndex;
             const isNearCurrent =
               index >= pagination.pageIndex - 1 &&
@@ -161,7 +159,7 @@ export function DataTable<TData, TValue>({
 
             return isNearCurrent ||
               index === 0 ||
-              index === Math.ceil(pageCount / pagination.pageSize) - 1 ? (
+              index === pageCount - 1 ? (
               <button
                 key={index}
                 className={`text-sm border rounded-sm p-1 w-8 h-8 ${

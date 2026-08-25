@@ -12,7 +12,7 @@ import {
   sendRecon,
   updateAmount,
 } from "@/utils/api";
-import { convertToIST } from "@/utils/formatDate";
+import { convertToIST, formatAmount } from "@/utils/formatDate";
 import type {
   Issue,
   IssueAction,
@@ -46,6 +46,8 @@ import {
 } from "@/utils/igm.api";
 import { EscalateIssueDialog } from "@/components/issue/EscalationModal";
 import { RaiseSettlementIssueDialog } from "@/components/settlements/raiseSettleIssue";
+import { ApiErrorState } from "@/components/ApiErrorState";
+import { retryUnlessClientError } from "@/utils/queryRetry";
 
 const OrderDetails: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -68,10 +70,11 @@ const OrderDetails: React.FC = () => {
   const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
   const [selectedResolutionId, setSelectedResolutionId] = useState<string>("");
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["orderDetails", orderId],
     queryFn: () => getOrderById(orderId!),
     placeholderData: keepPreviousData,
+    retry: retryUnlessClientError,
   });
 
   const sendReconMutation = useMutation({
@@ -175,7 +178,16 @@ const OrderDetails: React.FC = () => {
   const issues = order?.issues;
 
   if (isLoading) return <div>Loading...</div>;
-  if (isError) return <div>Something Went Wrong</div>;
+  // This endpoint returns 400 "Order not found" for an unknown orderId, not 404,
+  // and 403 when the token has no ADMIN role.
+  if (isError)
+    return (
+      <ApiErrorState
+        error={error}
+        fallback="Something Went Wrong"
+        onRetry={() => refetch()}
+      />
+    );
 
   const handleSendRecon = () => {
     sendReconMutation.mutate({
@@ -656,22 +668,84 @@ const OrderDetails: React.FC = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <DataCard>
-                <DataRow label="Amount" value={order.rpRouteTransfer.amount / 100} />
-                  <DataRow label="Status" value={order.rpRouteTransfer.status} />
-                  <DataRow label="Settlement Status" value={order.rpRouteTransfer.settlementStatus} />
-                  <DataRow label="RP Transfer ID" value={order.rpRouteTransfer.rpTransferId} />
-                  <DataRow label="RP Payment ID" value={order.rpRouteTransfer.rpPaymentId} />
+                  {/* Razorpay reports the amount in paise. */}
+                  <DataRow
+                    label="Amount"
+                    value={formatAmount(order.rpRouteTransfer.amount / 100)}
+                  />
+                  <DataRow
+                    label="Transfer Status"
+                    value={
+                      <span
+                        className={getStatusColor(order.rpRouteTransfer.status)}
+                      >
+                        {order.rpRouteTransfer.status || "-"}
+                      </span>
+                    }
+                  />
+                  <DataRow
+                    label="Transfer Status Updated At"
+                    value={convertToIST(order.rpRouteTransfer.statusUpdatedAt)}
+                  />
+                  <DataRow
+                    label="Transfer Settlement Status"
+                    value={
+                      order.rpRouteTransfer.settlementStatus ? (
+                        <span
+                          className={getStatusColor(
+                            order.rpRouteTransfer.settlementStatus
+                          )}
+                        >
+                          {order.rpRouteTransfer.settlementStatus}
+                        </span>
+                      ) : (
+                        "-"
+                      )
+                    }
+                  />
+                  <DataRow
+                    label="Transfer Settlement Updated At"
+                    value={convertToIST(
+                      order.rpRouteTransfer.settlementUpdatedAt
+                    )}
+                  />
+                  <DataRow
+                    label="Created At"
+                    value={convertToIST(order.rpRouteTransfer.createdAt)}
+                  />
                 </DataCard>
                 <DataCard>
-                <DataRow label="Created At" value={convertToIST(order.rpRouteTransfer.createdAt)} />
-                  <DataRow label="Status Updated At" value={convertToIST(order.rpRouteTransfer.statusUpdatedAt)} />
-                  <DataRow label="Settlement Updated At" value={convertToIST(order.rpRouteTransfer.settlementUpdatedAt)} />
-                  <DataRow label="RP Aczcount ID" value={order.rpRouteTransfer.rpAccountId} />
-                  <DataRow label="Updated At" value={convertToIST(order.rpRouteTransfer.statusUpdatedAt)} />
+                  <DataRow
+                    label="RP Transfer ID"
+                    value={order.rpRouteTransfer.rpTransferId || "-"}
+                  />
+                  <DataRow
+                    label="RP Payment ID"
+                    value={order.rpRouteTransfer.rpPaymentId || "-"}
+                  />
+                  <DataRow
+                    label="RP Account ID"
+                    value={order.rpRouteTransfer.rpAccountId || "-"}
+                  />
+                  {/* Only populated when the transfer failed. */}
+                  <DataRow
+                    label="Error Code"
+                    value={order.rpRouteTransfer.errorCode || "-"}
+                    className={
+                      order.rpRouteTransfer.errorCode ? "text-red-600" : ""
+                    }
+                  />
+                  <DataRow
+                    label="Error Description"
+                    value={order.rpRouteTransfer.errorDescription || "-"}
+                    className={
+                      order.rpRouteTransfer.errorDescription
+                        ? "text-red-600"
+                        : ""
+                    }
+                  />
                 </DataCard>
               </div>
-             
-           
             </div>
           </CardContent>
         </div>

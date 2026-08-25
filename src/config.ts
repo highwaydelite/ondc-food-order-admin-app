@@ -122,7 +122,7 @@ setInterval(async () => {
   }
 }, 1000 * 60 * 5);
 
-const refreshToken = async () => {
+export const refreshToken = async () => {
   try {
     const user = await userManager.signinSilent();
     console.log("Token refreshed successfully");
@@ -171,4 +171,22 @@ export const getQueryParamsAsObject = () => {
     result[key] = value;
   });
   return result;
+};
+/**
+ * Sends the user through the Keycloak login flow again. Called when a 401 could not
+ * be recovered by a silent refresh.
+ */
+export const redirectToLogin = async () => {
+  try {
+    sessionStorage.setItem(
+      "redirectPath",
+      `${window.location.pathname}${window.location.search}`
+    );
+    await userManager.signinRedirect({
+      extraQueryParams: getQueryParamsAsObject(),
+    });
+  } catch (error) {
+    console.error("Failed to redirect to login:", error);
+    window.location.href = import.meta.env.VITE_LOGOUT_REDIRECT_URL;
+  }
 };

@@ -25,7 +25,7 @@ interface SideBarProps {
 }
 
 const SideBar: React.FC<SideBarProps> = ({ hide, className }) => {
-  if (hide) return null;
+  // Hooks must run before any early return.
   const { userDetails } = useAuth();
   const location = useLocation();
 
@@ -75,6 +75,8 @@ const SideBar: React.FC<SideBarProps> = ({ hide, className }) => {
     // },
   ];
 
+  if (hide) return null;
+
   return (
     <Sidebar
       variant="sidebar"
@@ -96,7 +98,7 @@ const SideBar: React.FC<SideBarProps> = ({ hide, className }) => {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems?.map((item) => (
+              {menuItems.map((item) => (
                 <div key={item.label}>
                   <SidebarMenuItem className="mx-0">
                     <SidebarMenuButton asChild className="my-1">
