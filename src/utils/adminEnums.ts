@@ -135,6 +135,38 @@ export const sanitizeEnumValue = <K extends OrderFilterKey>(
   return "";
 };
 
+/**
+ * Free-text search fields. All three are partial + case-insensitive on the server, so
+ * the user's input is sent as typed: no upper/lower casing, and no escaping of `%` or
+ * `_` (the backend escapes LIKE metacharacters itself — escaping here would double it).
+ */
+export const ORDER_SEARCH_FIELDS = [
+  "orderId",
+  "paymentOrderId",
+  "userMobile",
+] as const;
+export type OrderSearchField = (typeof ORDER_SEARCH_FIELDS)[number];
+
+export const ORDER_SEARCH_LABELS: Record<OrderSearchField, string> = {
+  orderId: "Order ID",
+  paymentOrderId: "Payment Order ID",
+  userMobile: "Mobile",
+};
+
+export const ORDER_SEARCH_PLACEHOLDERS: Record<OrderSearchField, string> = {
+  orderId: "Search order ID",
+  paymentOrderId: "Search payment order ID",
+  userMobile: "Search mobile number",
+};
+
+/**
+ * A leading-wildcard match cannot use an index, so every keystroke is a full scan.
+ * Debounce, and require enough characters to be selective — a single "9" matches
+ * almost every phone number.
+ */
+export const SEARCH_DEBOUNCE_MS = 400;
+export const MIN_SEARCH_LENGTH = 3;
+
 export type OrderFilterState = {
   paymentStatus: string;
   orderStatus: string;
@@ -142,8 +174,9 @@ export type OrderFilterState = {
   settleStatus: string;
   transferStatus: string;
   createdAt: { startDate?: string; endDate?: string };
-  searchType: "userMobile" | "paymentOrderId";
-  searchValue: string;
+  orderId: string;
+  paymentOrderId: string;
+  userMobile: string;
 };
 
 export const EMPTY_ORDER_FILTERS: OrderFilterState = {
@@ -153,8 +186,9 @@ export const EMPTY_ORDER_FILTERS: OrderFilterState = {
   settleStatus: "",
   transferStatus: "",
   createdAt: { startDate: undefined, endDate: undefined },
-  searchType: "userMobile",
-  searchValue: "",
+  orderId: "",
+  paymentOrderId: "",
+  userMobile: "",
 };
 
 /** Use on every read of filter state that did not come straight from the dropdowns. */
@@ -172,11 +206,14 @@ export const sanitizeOrderFilters = (
     startDate: filters?.createdAt?.startDate || undefined,
     endDate: filters?.createdAt?.endDate || undefined,
   },
-  searchType:
-    filters?.searchType === "paymentOrderId" ? "paymentOrderId" : "userMobile",
-  searchValue:
-    typeof filters?.searchValue === "string" ? filters.searchValue : "",
+  // Search terms pass through untouched — see ORDER_SEARCH_FIELDS.
+  orderId: asSearchTerm(filters?.orderId),
+  paymentOrderId: asSearchTerm(filters?.paymentOrderId),
+  userMobile: asSearchTerm(filters?.userMobile),
 });
+
+const asSearchTerm = (value: unknown): string =>
+  typeof value === "string" ? value : "";
 
 export const humanizeEnumValue = (value: string): string =>
   value

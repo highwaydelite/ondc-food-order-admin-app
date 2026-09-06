@@ -64,6 +64,19 @@ const fallbackMessage = (statusCode: number) => {
 export const isApiError = (error: unknown): error is ApiError =>
   error instanceof ApiError;
 
+/**
+ * An aborted request (a superseded search, an unmounted screen) is not a failure —
+ * it must not be normalised into an ApiError, retried, or shown to the user.
+ */
+export const isCancelledError = (error: unknown): boolean => {
+  const candidate = error as { code?: string; name?: string } | null;
+  return (
+    candidate?.code === "ERR_CANCELED" ||
+    candidate?.name === "CanceledError" ||
+    candidate?.name === "AbortError"
+  );
+};
+
 export const isForbidden = (error: unknown): boolean =>
   isApiError(error) && error.isForbidden;
 

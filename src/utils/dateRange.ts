@@ -68,4 +68,10 @@ export const buildDateRangeParams = (
   endDate: istEndOfDayISO(range?.endDate),
 });
 
+/** "2026-08-24" -> "24 Aug 2026", for filter chips. */
+export const formatBusinessDayLabel = (value?: string | null): string => {
+  const day = businessDayToDayjs(value);
+  return day ? day.format("DD MMM YYYY") : "";
+};
+
 export { dayjs };

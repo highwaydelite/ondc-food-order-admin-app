@@ -10,8 +10,9 @@ export type OrderFilterParams = {
   transferStatus?: string;
   startDate?: string;
   endDate?: string;
-  userMobile?: string;
+  orderId?: string;
   paymentOrderId?: string;
+  userMobile?: string;
 };
 
 /**
@@ -25,7 +26,10 @@ export const buildOrderFilterParams = (
 ): OrderFilterParams => {
   const safe = sanitizeOrderFilters(filters);
   const { startDate, endDate } = buildDateRangeParams(safe.createdAt);
-  const searchValue = safe.searchValue.trim();
+
+  // Trimmed only to decide whether the box is empty; the value itself is sent as
+  // typed. A blank box omits the key rather than sending an empty string.
+  const searchTerm = (value: string) => value.trim() || undefined;
 
   return {
     paymentStatus: safe.paymentStatus || undefined,
@@ -35,12 +39,9 @@ export const buildOrderFilterParams = (
     transferStatus: safe.transferStatus || undefined,
     startDate,
     endDate,
-    userMobile:
-      safe.searchType === "userMobile" && searchValue ? searchValue : undefined,
-    paymentOrderId:
-      safe.searchType === "paymentOrderId" && searchValue
-        ? searchValue
-        : undefined,
+    orderId: searchTerm(safe.orderId),
+    paymentOrderId: searchTerm(safe.paymentOrderId),
+    userMobile: searchTerm(safe.userMobile),
   };
 };
 

@@ -6,6 +6,7 @@ import {
   AuthConfigurationError,
   apiErrorFromAxios,
   apiErrorFromResponse,
+  isCancelledError,
 } from "./apiError";
 import type { OrderFilterState } from "./adminEnums";
 import {
@@ -56,6 +57,9 @@ type RetriableConfig = AxiosRequestConfig & { _retriedAfterRefresh?: boolean };
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // A superseded/aborted request is not an API failure — pass it through untouched.
+    if (isCancelledError(error)) return Promise.reject(error);
+
     const status = error?.response?.status;
     const config = error?.config as RetriableConfig | undefined;
 
@@ -101,7 +105,11 @@ export type OrdersListParams = {
  * or an empty string, is a 400. There is no "fetch everything" mode any more; use
  * the CSV export for bulk data.
  */
-export async function getOrders(params: OrdersListParams) {
+export async function getOrders(
+  params: OrdersListParams,
+  /** react-query's per-query signal, so a superseded search is aborted in flight. */
+  signal?: AbortSignal
+) {
   const { page, limit } = normalizePagination(params.page, params.limit);
   const query = {
     page,
@@ -112,9 +120,11 @@ export async function getOrders(params: OrdersListParams) {
   try {
     const response = await axiosInstance.get(`/orders/admin/orders/`, {
       params: query,
+      signal,
     });
     return response.data;
   } catch (error) {
+    if (isCancelledError(error)) throw error;
     throw apiErrorFromAxios(error);
   }
 }

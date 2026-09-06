@@ -23,7 +23,8 @@ const Settlement = () => {
   });
   // const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["settlement", pagination.pageIndex, pagination.pageSize],
+    // Paging is client-side here, so it must not re-key (and refetch) the query.
+    queryKey: ["settlement", id],
     queryFn: () => getSettlementById(id!),
     enabled: !!id,
     placeholderData: keepPreviousData,
@@ -117,6 +118,9 @@ const Settlement = () => {
                 total={total}
                 pagination={pagination}
                 setPagination={setPagination}
+                // The settlement detail response returns every order at once, so the
+                // table has to do the slicing itself.
+                manualPagination={false}
                 // selectedIds={selectedIds}
                 // setSelectedIds={setSelectedIds}
               />

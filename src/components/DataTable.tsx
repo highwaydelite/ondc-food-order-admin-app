@@ -4,6 +4,7 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   useReactTable,
   type PaginationState,
   type Updater,
@@ -26,6 +27,12 @@ interface DataTableProps<TData, TValue> {
   total: number;
   pagination: PaginationState;
   setPagination: (updater: Updater<PaginationState>) => void;
+  /**
+   * True (default) when `data` already holds just one page, fetched with the current
+   * `page`/`limit`. Pass false when `data` holds every row — then the table slices it
+   * locally, otherwise every row renders and the page-size control does nothing.
+   */
+  manualPagination?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -34,21 +41,25 @@ export function DataTable<TData, TValue>({
   total,
   pagination,
   setPagination,
+  manualPagination = true,
 }: DataTableProps<TData, TValue>) {
-  // The table wants a page count; the API gives a row count.
-  const pageCount = Math.max(1, Math.ceil(total / Math.max(pagination.pageSize, 1)));
-
   const table = useReactTable({
     data,
     columns,
-    pageCount,
+    // The API gives a row count; the table derives the page count from it.
+    rowCount: total,
     state: {
       pagination,
     },
     onPaginationChange: (updater) => setPagination(updater),
     getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
+    getPaginationRowModel: manualPagination
+      ? undefined
+      : getPaginationRowModel(),
+    manualPagination,
   });
+
+  const pageCount = Math.max(1, table.getPageCount());
 
   return (
     <div className="relative z-0 p-0">
