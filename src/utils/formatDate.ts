@@ -38,3 +38,16 @@ export const formatAmount = (
     maximumFractionDigits: 2,
   }).format(amount);
 };
+
+/**
+ * Coerces an amount for arithmetic. The settlement APIs return the same field as a
+ * JSON number in one response and a string ("249.5") in another, so anything summed
+ * has to go through here first — a stray string would concatenate, a bad value would
+ * poison the whole total with NaN.
+ */
+export const toAmount = (value?: string | number | null): number => {
+  if (value === null || value === undefined || value === "") return 0;
+
+  const amount = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};

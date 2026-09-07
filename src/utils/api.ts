@@ -285,6 +285,95 @@ export async function getSettlements(params: {
   }
 }
 
+/* ------------------------------------------------------------------------- *
+ * Manual (offline) seller settlements.
+ *
+ * The payout itself happens outside the system — a person makes a bank transfer and
+ * then records the UTR here. There is no automated payout, no partial settle and no
+ * un-settle, so every write below is final.
+ *
+ * Amounts are inconsistently typed across these endpoints: `pendingAmount` and the
+ * settle response's `totalAmount` are JSON numbers, while `sellerAmount` and the
+ * stored `totalAmount` are strings ("249.5"). Callers must coerce — `formatAmount`
+ * and `toAmount` in utils/formatDate both take either.
+ * ------------------------------------------------------------------------- */
+
+/** Seller-wise pending amounts. Only orders delivered before today are counted. */
+export async function getPendingSellerSettlements() {
+  try {
+    const response = await axiosInstance.get(`/seller-settlements/pending`);
+    return response.data;
+  } catch (error) {
+    throw apiErrorFromAxios(error);
+  }
+}
+
+/** The orders making up one seller's pending amount — informational only. */
+export async function getPendingSellerOrders(sellerId: string) {
+  try {
+    const response = await axiosInstance.get(
+      `/seller-settlements/pending/${sellerId}/orders`
+    );
+    return response.data;
+  } catch (error) {
+    throw apiErrorFromAxios(error);
+  }
+}
+
+/**
+ * Records a payout that has already been made offline. Settles ALL of that seller's
+ * currently-pending orders under one UTR — the server re-resolves the order list, so
+ * there is nothing to send but the reference.
+ *
+ * 400 "No pending settlement for this seller" means someone else settled it first;
+ * the caller's pending list is stale and must be refetched.
+ */
+export async function settleSeller(data: {
+  sellerId: string;
+  utrNumber: string;
+}) {
+  try {
+    const response = await axiosInstance.post(
+      `/seller-settlements/${data.sellerId}/settle`,
+      { utrNumber: data.utrNumber }
+    );
+    return response.data;
+  } catch (error) {
+    throw apiErrorFromAxios(error);
+  }
+}
+
+/**
+ * Completed settlements, newest first. The payload is double-nested: the rows are at
+ * `data.data.data` with the pagination metadata alongside them at `data.data.total`.
+ */
+export async function getSellerSettlements(params: {
+  page: number;
+  limit: number;
+}) {
+  try {
+    const { page, limit } = normalizePagination(params.page, params.limit);
+    const response = await axiosInstance.get(`/seller-settlements`, {
+      params: { page, limit },
+    });
+    return response.data;
+  } catch (error) {
+    throw apiErrorFromAxios(error);
+  }
+}
+
+/** The orders that were included in one completed settlement. 404 if unknown. */
+export async function getSellerSettlementOrders(settlementId: string) {
+  try {
+    const response = await axiosInstance.get(
+      `/seller-settlements/${settlementId}/orders`
+    );
+    return response.data;
+  } catch (error) {
+    throw apiErrorFromAxios(error);
+  }
+}
+
 export async function selfSettle(data: { amount: number }) {
   try {
     const requestData = {

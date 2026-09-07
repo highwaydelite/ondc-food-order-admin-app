@@ -5,8 +5,9 @@ import Layout from "./Layout";
 import NotFound from "./components/NotFound";
 import Dashboard from "./pages/Dashboard";
 import OrderDetails from "./pages/orderDetails";
-import Settlements from "./pages/settlements/Settlements";
 import Settlement from "./pages/settlements/Settlement";
+import SellerSettlements from "./pages/settlements/SellerSettlements";
+import SettlementOrders from "./pages/settlements/SettlementOrders";
 import Issues from "./pages/issues/Issues";
 import SellerIssues from "./pages/issues/SellerIssues";
 import SellerIssue from "./pages/issues/SellerIssue";
@@ -21,7 +22,20 @@ function App() {
             <Route path="admin">
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="order/:orderId" element={<OrderDetails />} />
-              <Route path="settlements" element={<Settlements />} />
+              {/*
+                Payouts are manual now: the Settlements section is the offline
+                seller-settlement screen. The old ONDC settlement list is gone, but its
+                detail page stays routed — order details still deep-links into it.
+              */}
+              <Route path="settlements" element={<SellerSettlements />} />
+              <Route
+                path="settlements/pending/:sellerId"
+                element={<SettlementOrders />}
+              />
+              <Route
+                path="settlements/settled/:settlementId"
+                element={<SettlementOrders />}
+              />
               <Route path="settlements/:id" element={<Settlement />} />
               <Route path="issues" element={<Issues />} />
 
