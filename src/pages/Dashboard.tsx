@@ -187,7 +187,7 @@ const Dashboard: React.FC = () => {
       />
     );
 
-  // quote / payment / billing / rpRouteTransfer can each be null — guard every access.
+  // quote / payment / billing can each be null — guard every access.
   const transformedOrders = (data?.data?.orders ?? []).map((order: any) => ({
     orderId: order.id,
     paymentOrderId: order.paymentOrderId,
@@ -204,12 +204,6 @@ const Dashboard: React.FC = () => {
     issueStatusAt: order.issueStatusAt,
     settleStatus: order.payment?.settleStatus ?? "NA",
     settleStatusAt: order.payment?.settleUpdatedAt ?? null,
-    // "no transfer record" and "transfer exists but has no settlement status yet"
-    // must read differently, so keep them as distinct states rather than one "NA".
-    hasTransfer: Boolean(order.rpRouteTransfer),
-    transferStatus: order.rpRouteTransfer?.status ?? null,
-    transferStatusAt: order.rpRouteTransfer?.statusUpdatedAt ?? null,
-    transferSettleStatus: order.rpRouteTransfer?.settlementStatus ?? null,
   }));
 
   const pendingMinLength = ORDER_SEARCH_FIELDS.some((field) => {

@@ -11,15 +11,10 @@ export type Order = {
   orderId: string;
   orderStatus: string;
   createdAt: string;
-  hasTransfer?: boolean;
-  transferStatus?: string | null;
-  transferStatusAt?: string | null;
-  transferSettleStatus?: string | null;
+  /** `payment.settleStatus` — the order's payment settlement, "NA" when unpaid. */
+  settleStatus?: string | null;
+  settleStatusAt?: string | null;
 };
-
-const noTransferLabel = (
-  <span className="text-xs text-muted-foreground">No transfer</span>
-);
 
 export const columns: ColumnDef<Order>[] = [
   {
@@ -135,12 +130,13 @@ export const columns: ColumnDef<Order>[] = [
       );
     },
   },
+  // The Razorpay Route transfer columns are gone: payouts are recorded manually in
+  // the Settlements section now, so `rpRouteTransfer` is null on new orders.
   {
-    accessorKey: "transferStatus",
-    header: "Transfer Status",
+    accessorKey: "settleStatus",
+    header: "Settlement Status",
     cell: ({ row }) => {
-      if (!row.original.hasTransfer) return noTransferLabel;
-      const status = row.getValue("transferStatus") as string | null;
+      const status = row.getValue("settleStatus") as string | null;
       return status ? (
         <span className={getStatusColor(status)}>{status}</span>
       ) : (
@@ -149,27 +145,15 @@ export const columns: ColumnDef<Order>[] = [
     },
   },
   {
-    accessorKey: "transferStatusAt",
-    header: "Transfer Status Updated At",
-    cell: ({ row }) => (
-      <div className="whitespace-nowrap w-32 text-center">
-        {row.original.hasTransfer
-          ? convertToIST(row.getValue("transferStatusAt"))
-          : "—"}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "transferSettleStatus",
-    header: "Transfer Settlement Status",
+    accessorKey: "settleStatusAt",
+    header: "Settlement Status Updated At",
     cell: ({ row }) => {
-      // No transfer at all vs. a transfer that has not been settled yet.
-      if (!row.original.hasTransfer) return noTransferLabel;
-      const status = row.getValue("transferSettleStatus") as string | null;
-      return status ? (
-        <span className={getStatusColor(status)}>{status}</span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
+      // Null until the payment's settlement status actually moves.
+      const date = row.getValue("settleStatusAt") as string | null;
+      return (
+        <div className="whitespace-nowrap w-32 text-center">
+          {date ? convertToIST(date) : "-"}
+        </div>
       );
     },
   },
