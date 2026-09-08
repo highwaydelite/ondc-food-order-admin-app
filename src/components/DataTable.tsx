@@ -4,6 +4,7 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   useReactTable,
   type PaginationState,
   type Updater,
@@ -22,29 +23,43 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  pageCount: number;
+  /** Total number of matching rows (`data.total` from the API), not the page size. */
+  total: number;
   pagination: PaginationState;
   setPagination: (updater: Updater<PaginationState>) => void;
+  /**
+   * True (default) when `data` already holds just one page, fetched with the current
+   * `page`/`limit`. Pass false when `data` holds every row — then the table slices it
+   * locally, otherwise every row renders and the page-size control does nothing.
+   */
+  manualPagination?: boolean;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
-  pageCount,
+  total,
   pagination,
   setPagination,
+  manualPagination = true,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
-    pageCount,
+    // The API gives a row count; the table derives the page count from it.
+    rowCount: total,
     state: {
       pagination,
     },
     onPaginationChange: (updater) => setPagination(updater),
     getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
+    getPaginationRowModel: manualPagination
+      ? undefined
+      : getPaginationRowModel(),
+    manualPagination,
   });
+
+  const pageCount = Math.max(1, table.getPageCount());
 
   return (
     <div className="relative z-0 p-0">
@@ -119,13 +134,9 @@ export function DataTable<TData, TValue>({
       <div className="flex items-center justify-between mt-4 flex-wrap">
         <span className="text-sm text-gray-400">
           Showing data{" "}
-          {Math.min(pagination.pageIndex * pagination.pageSize + 1, pageCount)}{" "}
-          to{" "}
-          {Math.min(
-            (pagination.pageIndex + 1) * pagination.pageSize,
-            pageCount
-          )}{" "}
-          of {pageCount} {""}
+          {Math.min(pagination.pageIndex * pagination.pageSize + 1, total)} to{" "}
+          {Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)} of{" "}
+          {total} {""}
         </span>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -151,9 +162,7 @@ export function DataTable<TData, TValue>({
             {"<"}
           </button>
 
-          {Array.from({
-            length: Math.ceil(pageCount / pagination.pageSize),
-          }).map((_, index) => {
+          {Array.from({ length: pageCount }).map((_, index) => {
             const isCurrent = index === pagination.pageIndex;
             const isNearCurrent =
               index >= pagination.pageIndex - 1 &&
@@ -161,7 +170,7 @@ export function DataTable<TData, TValue>({
 
             return isNearCurrent ||
               index === 0 ||
-              index === Math.ceil(pageCount / pagination.pageSize) - 1 ? (
+              index === pageCount - 1 ? (
               <button
                 key={index}
                 className={`text-sm border rounded-sm p-1 w-8 h-8 ${

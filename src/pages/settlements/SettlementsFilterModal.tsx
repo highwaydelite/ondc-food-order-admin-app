@@ -14,20 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import type { DateRange } from "react-day-picker";
-
 import { Filter } from "lucide-react";
+import { BusinessDayRangePicker } from "@/components/BusinessDayRangePicker";
 
-// Updated status options based on your backend enums
+/**
+ * NOTE: this is the ONDC settlement enum used by `GET /ret11/settlement/all` — a
+ * different enum from the order `settleStatus` in `@/utils/adminEnums`, which was
+ * corrected separately. Do not merge the two lists.
+ */
 const statusOptions = {
   settleStatus: [
     "INITIATED",
@@ -95,25 +89,6 @@ export function SettlementsFilterModal({
           ? { ...(prev[key] as object), ...value }
           : value,
     }));
-  };
-
-  const dateRange: DateRange = {
-    from: localFilters.createdAt.startDate
-      ? new Date(localFilters.createdAt.startDate)
-      : undefined,
-    to: localFilters.createdAt.endDate
-      ? new Date(localFilters.createdAt.endDate)
-      : undefined,
-  };
-
-  const handleDateChange = (
-    dateType: "createdAt",
-    field: "startDate" | "endDate",
-    value?: string
-  ) => {
-    handleFilterChange(dateType, {
-      [field]: value,
-    });
   };
 
   const handleApply = () => {
@@ -296,57 +271,19 @@ export function SettlementsFilterModal({
                 Created At
               </label>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "dd MMM yyyy")} –{" "}
-                          {format(dateRange.to, "dd MMM yyyy")}
-                        </>
-                      ) : (
-                        format(dateRange.from, "dd MMM yyyy")
-                      )
-                    ) : (
-                      <span className="text-muted-foreground">
-                        Select date range
-                      </span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-
-                <PopoverContent
-                  align="start"
-                  side="bottom"
-                  className="z-50 w-auto p-0"
-                  sideOffset={8}
-                >
-                  <Calendar
-                    mode="range"
-                    selected={dateRange}
-                    onSelect={(range) => {
-                      handleDateChange(
-                        "createdAt",
-                        "startDate",
-                        range?.from?.toISOString()
-                      );
-                      handleDateChange(
-                        "createdAt",
-                        "endDate",
-                        range?.to?.toISOString()
-                      );
-                    }}
-                    numberOfMonths={2}
-                    fixedWeeks
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <BusinessDayRangePicker
+                className="w-full"
+                value={localFilters.createdAt}
+                onChange={(range) =>
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    createdAt: {
+                      startDate: range.startDate ?? "",
+                      endDate: range.endDate ?? "",
+                    },
+                  }))
+                }
+              />
             </div>
           </div>
         </div>

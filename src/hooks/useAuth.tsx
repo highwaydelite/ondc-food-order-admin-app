@@ -25,6 +25,10 @@ interface UserDetailsProps {
   sub: string
 }
 
+/**
+ * Exposes the signed-in user for display purposes only. Authorization is enforced
+ * entirely by the backend — nothing here decides whether a screen may be rendered.
+ */
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -48,16 +52,21 @@ export const useAuth = () => {
 
           // Decode the access token to get roles
           const decodedToken = jwtDecode<DecodedToken>(user.access_token)
+          const clientRoles =
+            decodedToken.resource_access?.[clientId]?.roles ?? []
+          const normalizedRoles = clientRoles.map((role: string) =>
+            role.toUpperCase()
+          )
+
           setUserDetails({
             name: decodedToken.name,
             email: decodedToken.email,
             preferred_username: decodedToken.preferred_username,
             token: user.access_token,
-            role: decodedToken.resource_access[clientId]?.roles.map((role: string) => role.toUpperCase()) || [],
+            role: normalizedRoles,
             sub: decodedToken.sub.split(':')[2],
           })
-          const userRoles = decodedToken.resource_access[clientId]?.roles || []
-          setRoles(userRoles)
+          setRoles(normalizedRoles)
         } else {
           setIsAuthenticated(false)
           setRoles([])
@@ -89,7 +98,5 @@ export const useAuth = () => {
     }
   }, [clientId])
 
-  const hasRole = (role: string) => roles.includes(role)
-
-  return { isAuthenticated, isLoading, roles, hasRole, userDetails }
+  return { isAuthenticated, isLoading, roles, userDetails }
 }

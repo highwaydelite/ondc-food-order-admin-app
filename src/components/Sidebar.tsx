@@ -10,10 +10,10 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "./ui/sidebar";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,7 +25,7 @@ interface SideBarProps {
 }
 
 const SideBar: React.FC<SideBarProps> = ({ hide, className }) => {
-  if (hide) return null;
+  // Hooks must run before any early return.
   const { userDetails } = useAuth();
   const location = useLocation();
 
@@ -75,6 +75,8 @@ const SideBar: React.FC<SideBarProps> = ({ hide, className }) => {
     // },
   ];
 
+  if (hide) return null;
+
   return (
     <Sidebar
       variant="sidebar"
@@ -84,8 +86,10 @@ const SideBar: React.FC<SideBarProps> = ({ hide, className }) => {
     >
       <SidebarContent className="bg-white">
         <SidebarGroup>
-          <SidebarGroupLabel className="h-auto py-8 px-4 pt-0">
-            <div className="flex flex-col items-start justify-center z-10 gap-1">
+          {/* Name + toggle row. Collapsed to the icon rail, the name drops out
+              and the toggle stays, centered above the menu icons. */}
+          <div className="flex items-start justify-between gap-2 px-4 pb-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:pb-4">
+            <div className="flex flex-col items-start justify-center z-10 gap-1 group-data-[collapsible=icon]:hidden">
               <h3 className="text-black text-xl font-semibold mt-4">
                 {userDetails.name || ""}
               </h3>
@@ -93,10 +97,11 @@ const SideBar: React.FC<SideBarProps> = ({ hide, className }) => {
                 {userDetails.role?.join(" & ") || ""}
               </p>
             </div>
-          </SidebarGroupLabel>
+            <SidebarTrigger className="mt-4 shrink-0 text-black group-data-[collapsible=icon]:mt-0" />
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems?.map((item) => (
+              {menuItems.map((item) => (
                 <div key={item.label}>
                   <SidebarMenuItem className="mx-0">
                     <SidebarMenuButton asChild className="my-1">

@@ -44,10 +44,19 @@ function SheetOverlay({
   )
 }
 
+// Ant Design overlays (date pickers, selects) render in their own container. A click
+// inside one must not count as an "outside" click, or the sheet would close mid-selection.
+const ANT_OVERLAY_SELECTOR =
+  ".ant-picker-dropdown, .ant-select-dropdown, .ant-dropdown, .ant-tooltip, .ant-popover"
+
+const isInsideAntOverlay = (target: EventTarget | null) =>
+  target instanceof Element && !!target.closest(ANT_OVERLAY_SELECTOR)
+
 function SheetContent({
   className,
   children,
   side = "right",
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
@@ -69,6 +78,13 @@ function SheetContent({
             "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
           className
         )}
+        onInteractOutside={(event) => {
+          if (isInsideAntOverlay(event.target)) {
+            event.preventDefault()
+            return
+          }
+          onInteractOutside?.(event)
+        }}
         {...props}
       >
         {children}

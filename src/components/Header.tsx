@@ -2,7 +2,7 @@
 import logo from "../assets/images/logo.png";
 // import { Drawer } from 'vaul'
 // import Notification from './Notification'
-import { SidebarTrigger } from "./ui/sidebar";
+import { SidebarTrigger, useSidebar } from "./ui/sidebar";
 // import { BellIcon } from 'lucide-react'
 
 interface HeaderProps {
@@ -11,13 +11,26 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ className, hide }) => {
+  const { state, isMobile } = useSidebar();
+
   if (hide) return null;
+
+  const showTrigger = isMobile;
+
+  const titleOffset = isMobile
+    ? undefined
+    : state === "collapsed"
+    ? "calc(var(--sidebar-width-icon) - 2rem)"
+    : "calc(var(--sidebar-width) - 2rem)";
 
   return (
     <header
       className={`z-20 sticky top-0 left-0 flex flex-row items-center justify-between p-4 px-8 bg-white space-y-4 md:space-y-0 ${className}`}
     >
-      <div className="flex justify-center items-center flex-row-reverse md:lg:flex-row gap-2">
+      <div
+        style={{ minWidth: titleOffset }}
+        className="flex items-center justify-start flex-row-reverse md:flex-row gap-2 transition-[min-width] duration-200 ease-linear"
+      >
         <div className="flex items-center justify-start">
           <img
             src={logo}
@@ -26,9 +39,11 @@ const Header: React.FC<HeaderProps> = ({ className, hide }) => {
           />
         </div>
 
-        <div>
-          <SidebarTrigger className="ml-0 md:ml-36" />
-        </div>
+        {showTrigger && (
+          <div>
+            <SidebarTrigger />
+          </div>
+        )}
       </div>
 
       {/* Title */}

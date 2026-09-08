@@ -1,8 +1,9 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Link } from "react-router-dom";
-import { convertToIST } from "@/utils/formatDate";
+import { convertToIST, formatAmount } from "@/utils/formatDate";
 import { getStatusColor } from "@/utils/getStatusColor";
 import { TruncatedUUID } from "../TruncateUUID";
+import { ORDER_FILTER_OPTIONS } from "@/utils/adminEnums";
 
 export type Order = {
   id: string;
@@ -10,6 +11,9 @@ export type Order = {
   orderId: string;
   orderStatus: string;
   createdAt: string;
+  /** `payment.settleStatus` — the order's payment settlement, "NA" when unpaid. */
+  settleStatus?: string | null;
+  settleStatusAt?: string | null;
 };
 
 export const columns: ColumnDef<Order>[] = [
@@ -53,6 +57,12 @@ export const columns: ColumnDef<Order>[] = [
   {
     accessorKey: "amount",
     header: "Amount",
+    // `quote.value` is a string ("101.50" / "100.5") — parse before formatting.
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap">
+        {formatAmount(row.getValue("amount") as string | null)}
+      </span>
+    ),
   },
   {
     accessorKey: "createdAt",
@@ -120,57 +130,37 @@ export const columns: ColumnDef<Order>[] = [
       );
     },
   },
+  // The Razorpay Route transfer columns are gone: payouts are recorded manually in
+  // the Settlements section now, so `rpRouteTransfer` is null on new orders.
   {
-    accessorKey: "transferStatus",
-    header: "Transfer Status",
-    cell: ({ row }) => (
-      <span className={`${getStatusColor(row.getValue("transferStatus"))}`}>
-        {row.getValue("transferStatus")}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "transferStatusAt",
-    header: "Transfer Status Updated At",
+    accessorKey: "settleStatus",
+    header: "Settlement Status",
     cell: ({ row }) => {
-      const date = row.getValue("transferStatusAt");
-      console.log(date);
-      return (
-        <div className="whitespace-nowrap w-32 text-center">
-          {date ? convertToIST(row.getValue("transferStatusAt")) : "-"}
-        </div>
+      const status = row.getValue("settleStatus") as string | null;
+      return status ? (
+        <span className={getStatusColor(status)}>{status}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
       );
     },
   },
   {
-    accessorKey: "transferSettleStatus",
-    header: "Transfer Settlement Status",
-    cell: ({ row }) => (
-      <span className={`${getStatusColor(row.getValue("transferSettleStatus"))}`}>
-        {row.getValue("transferSettleStatus")}
-      </span>
-    ),
+    accessorKey: "settleStatusAt",
+    header: "Settlement Status Updated At",
+    cell: ({ row }) => {
+      // Null until the payment's settlement status actually moves.
+      const date = row.getValue("settleStatusAt") as string | null;
+      return (
+        <div className="whitespace-nowrap w-32 text-center">
+          {date ? convertToIST(date) : "-"}
+        </div>
+      );
+    },
   },
 ];
 
-export const statusOptions = {
-  paymentStatus: ["INITIATED", "PENDING", "SUCCESS", "FAILURE"],
-  orderStatus: [
-    "Created",
-    "Pending",
-    "Accepted",
-    "Cancelled",
-    "Completed",
-    "In_progress",
-  ],
-  issueStatus: ["NONE", "OPEN", "ESCALATED_TO_SELLER", "CLOSED"],
-  settleStatus: [
-    "INITIATED",
-    "NOT_SETTLED",
-    "SETTLED",
-    "FAILURE",
-    "PENDING",
-    "CORRECTION_REQUIRED",
-    "CORRECTION_APPROVED",
-  ],
-};
+/**
+ * Kept as a named export for existing importers; the source of truth for the filter
+ * enums is `@/utils/adminEnums`, which is validated against the backend contract.
+ */
+export const statusOptions = ORDER_FILTER_OPTIONS;

@@ -146,3 +146,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/*
+ * Ant Design overlays are mounted inside the Radix sheet content (see
+ * BusinessDayRangePicker), which is z-50; keep them above it, and keep them clickable
+ * even when a modal sets `pointer-events: none` on everything outside its content.
+ */
+.ant-picker-dropdown,
+.ant-select-dropdown {
+  z-index: 60;
+  pointer-events: auto;
+}

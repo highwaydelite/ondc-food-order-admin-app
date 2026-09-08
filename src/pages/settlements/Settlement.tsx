@@ -4,6 +4,8 @@ import type { PaginationState } from "@tanstack/react-table";
 // import { DataTable } from '../DataTable'
 // import { FilterModal } from '../FilterModal'
 import TableLoaderSkeleton from "@/components/TableLoaderSkeleton";
+import { ApiErrorState } from "@/components/ApiErrorState";
+import { retryUnlessClientError } from "@/utils/queryRetry";
 import { getSettlementById, report } from "@/utils/api";
 import type { TRV14SettlementType } from "./columns";
 import { columns } from "./columns";
@@ -20,11 +22,13 @@ const Settlement = () => {
     pageSize: 10,
   });
   // const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["settlement", pagination.pageIndex, pagination.pageSize],
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    // Paging is client-side here, so it must not re-key (and refetch) the query.
+    queryKey: ["settlement", id],
     queryFn: () => getSettlementById(id!),
     enabled: !!id,
     placeholderData: keepPreviousData,
+    retry: retryUnlessClientError,
   });
 
   const reportMutation = useMutation({
@@ -39,7 +43,15 @@ const Settlement = () => {
   });
 
   if (isLoading) return <TableLoaderSkeleton />;
-  if (isError) return <div>Error: {(error as Error).message}</div>;
+  // GET /ret11/settlement/:settlementId now requires the ADMIN role.
+  if (isError)
+    return (
+      <ApiErrorState
+        error={error}
+        fallback="Cannot fetch settlement"
+        onRetry={() => refetch()}
+      />
+    );
   const settlement: TRV14SettlementType = data.data;
   console.log("settlement data:", settlement);
   const transformedOrders = settlement.settlementOrders;
@@ -103,9 +115,12 @@ const Settlement = () => {
               <DataTable
                 columns={columns}
                 data={transformedOrders}
-                pageCount={total}
+                total={total}
                 pagination={pagination}
                 setPagination={setPagination}
+                // The settlement detail response returns every order at once, so the
+                // table has to do the slicing itself.
+                manualPagination={false}
                 // selectedIds={selectedIds}
                 // setSelectedIds={setSelectedIds}
               />

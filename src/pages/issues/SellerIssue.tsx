@@ -6,6 +6,8 @@ import {
   sendOnIssue,
 } from "@/utils/igm.api";
 import TableLoaderSkeleton from "@/components/TableLoaderSkeleton";
+import { ApiErrorState } from "@/components/ApiErrorState";
+import { retryUnlessClientError } from "@/utils/queryRetry";
 import type {
   Issue,
   IssueAction,
@@ -40,6 +42,7 @@ const SellerIssue = () => {
     queryKey: ["Seller_Issue", id],
     queryFn: () => getSellerIssueById({ id: id }),
     placeholderData: keepPreviousData,
+    retry: retryUnlessClientError,
   });
 
   const issueStatusMutation = useMutation({
@@ -76,7 +79,14 @@ const SellerIssue = () => {
   ] as const;
 
   if (isLoading) return <TableLoaderSkeleton />;
-  if (isError) return <div>Error: {(error as Error).message}</div>;
+  if (isError)
+    return (
+      <ApiErrorState
+        error={error}
+        fallback="Cannot fetch seller issue"
+        onRetry={() => refetch()}
+      />
+    );
 
   const issue: Issue = data.data.issue;
 

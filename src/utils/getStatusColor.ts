@@ -4,9 +4,11 @@ export function getStatusColor(status: string) {
     case "INITIATED":
     case "NONE":
     case "Created":
+    case "CREATED":
     case "OPEN":
       return "border border-[#A0AEC0] bg-[#E2E8F0] text-black text-[11px] font-light px-3 py-1 rounded w-fit"; // Gray
     case "PENDING":
+    case "ON_HOLD":
     case "OPENED":
     case "In_progress":
     case "Pending":
@@ -20,6 +22,8 @@ export function getStatusColor(status: string) {
       case 'PROCESSED':
       return "border border-[#3CD856] bg-[#DCFCE7] text-black text-[11px] font-light px-3 py-1 rounded w-fit"; // Green
     case "SOFT_CANCEL":
+    case "REVERSED":
+    case "PARTIALLY_REVERSED":
     case "ESCALATED_TO_SELLER":
       return "border border-[#F97316] bg-[#FFEDD5] text-black text-[11px] font-light px-3 py-1 rounded w-fit"; // Orange
     case "CANCELLED":

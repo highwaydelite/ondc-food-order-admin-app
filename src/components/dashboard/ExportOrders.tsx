@@ -1,50 +1,67 @@
-import { Download } from "lucide-react";
-import { exportOrders } from "@/utils/api";
+import { useState } from "react";
+import { Download, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { exportOrdersCsv } from "@/utils/api";
+import { isApiError } from "@/utils/apiError";
+import { BUSINESS_TIMEZONE, dayjs } from "@/utils/dateRange";
+import type { OrderFilterState } from "@/utils/adminEnums";
 
 interface ExportButtonProps {
-  filters: any;
+  filters: Partial<OrderFilterState>;
 }
 
 export const ExportOrdersButton: React.FC<ExportButtonProps> = ({
   filters,
 }) => {
-  const handleExport = async () => {
-    try {
-      const blob = await exportOrders({
-        paymentStatus: filters.paymentStatus || undefined,
-        orderStatus: filters.orderStatus || undefined,
-        issueStatus: filters.issueStatus || undefined,
-        settleStatus: filters.settleStatus || undefined,
-        startDate: filters.createdAt?.startDate || undefined,
-        endDate: filters.createdAt?.endDate || undefined,
-        userMobile:
-          filters.searchType === "userMobile" ? filters.searchValue : undefined,
-        paymentOrderId:
-          filters.searchType === "paymentOrderId"
-            ? filters.searchValue
-            : undefined,
-      });
+  const [isExporting, setIsExporting] = useState(false);
 
-      const url = window.URL.createObjectURL(blob);
+  const handleExport = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+
+    try {
+      const blob = await exportOrdersCsv(filters);
+
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `orders_${Date.now()}.xlsx`;
+
+      link.download = `orders-${dayjs()
+        .tz(BUSINESS_TIMEZONE)
+        .format("YYYY-MM-DD")}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
+
+      toast.success("Orders exported");
     } catch (error) {
       console.error("Export failed", error);
-      alert("Failed to export orders");
+      const message = isApiError(error)
+        ? error.isForbidden
+          ? "You do not have permission to export orders"
+          : error.message
+        : "Failed to export orders";
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
   return (
     <button
       onClick={handleExport}
-      className="flex items-center h-10 px-4 rounded-md border bg-white hover:bg-muted transition"
+      disabled={isExporting}
+      title="Export orders as CSV"
+      aria-label="Export orders as CSV"
+      className="flex items-center gap-2 h-10 px-4 rounded-md border bg-white hover:bg-muted transition disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <Download className="h-4 w-4" />
+      {isExporting ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Download className="h-4 w-4" />
+      )}
+      <span className="text-sm">{isExporting ? "Exporting…" : "CSV"}</span>
     </button>
   );
 };

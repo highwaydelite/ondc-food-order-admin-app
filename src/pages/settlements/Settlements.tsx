@@ -9,6 +9,8 @@ import { SelfSettleModal } from "./selfSettleModal";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/DataTable";
 import TableLoaderSkeleton from "@/components/TableLoaderSkeleton";
+import { ApiErrorState } from "@/components/ApiErrorState";
+import { retryUnlessClientError } from "@/utils/queryRetry";
 import { getSettlements } from "@/utils/api";
 
 const Settlements = () => {
@@ -33,7 +35,7 @@ const Settlements = () => {
     // reconAccord: "",
   });
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: [
       "settlements",
       pagination.pageIndex,
@@ -47,16 +49,25 @@ const Settlements = () => {
         ...filters,
       }),
     placeholderData: keepPreviousData,
+    retry: retryUnlessClientError,
   });
 
   if (isLoading) return <TableLoaderSkeleton />;
-  if (isError) return <div>Error: {(error as Error).message}</div>;
+  // GET /ret11/settlement/all now requires the ADMIN role — a non-admin token gets a 403.
+  if (isError)
+    return (
+      <ApiErrorState
+        error={error}
+        fallback="Cannot fetch settlements"
+        onRetry={() => refetch()}
+      />
+    );
 
-  const orders: Settlement[] = data.data.settlements;
+  const orders: Settlement[] = data?.data?.settlements ?? [];
   console.log(orders);
 
   const transformedOrders = orders;
-  const total = data.data.total;
+  const total = data?.data?.total ?? 0;
 
   const handleApplyFilters = (newFilters: typeof filters) => {
     setFilters(newFilters);
@@ -97,7 +108,7 @@ const Settlements = () => {
         <DataTable
           columns={columns}
           data={transformedOrders}
-          pageCount={total}
+          total={total}
           pagination={pagination}
           setPagination={setPagination}
         />
